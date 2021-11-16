@@ -12,13 +12,43 @@
 
 b64_path=$(which base64)
 xclip_path=$(which xclip) 
-zip=$(which gzip)
+gzip=$(which gzip)
 
-if [[ $b64_path = "" ]]
-then
-	echo "Base64 not found"
-	exit 1
-fi
+xclip=Flase
+zip=False
+
+function check_xclip() {
+	if [[ $xclip_path = "" ]]
+	then 
+		xclip=False
+	else 
+		xclip=True
+	fi
+}
+
+function check_b64() {
+	if [[ $b64_path = "" ]]
+	then
+		echo "Base64 not found"
+		exit 1
+	fi
+}
+
+function check_compression(){
+	if [[ $2 = "" ]]
+	then
+		zip=True
+	elif [[ $2 = "-n" || $2 = "--no-compression" ]]; then
+		zip=False
+	else
+		echo unknown flag $2
+		exit 1
+	fi
+}
+
+check_b64
+check_xclip
+check_compression
 
 if [[ $1 = "" ]]
 then
@@ -26,44 +56,53 @@ then
 	exit 1
 fi
 
-
-
-
-#compress binary for easier pasting
-echo "Compressing Binary to /tmp/tmp.txt"
-$zip -c $1 > /dev/shm/tmp.txt
-sleep 1
+if [[ $zip = True ]]
+then
+	echo "Compressing Binary to /dev/shm/tmp.txt"
+	cp $1 /dev/shm/tmp
+	$gzip /dev/shm/tmp
+	sleep 1
+else
+	echo "-n/--no-compression detected: Skipping Compression"
+	cp $1 /dev/shm/tmp.gz
+	sleep 1
+fi
 
 # Encode Binary in base64 and copy output to clipboard using xclip
 echo "Encoding Binary with Base64"
 sleep 1
 
-if [[ $xclip_path = "" ]]
-then 
-	echo "xclip not found. Outputting to tmp.txt"
-	$b64_path /dev/shm/tmp.txt > tmp.txt
-	echo  Binary has been output to tmp.txt
-else 
-	echo "xclip found. Copying file to clipboard"
-	$b64_path /dev/shm/tmp.txt | xclip  -sel c
-	echo Binary has been copied to clipboard
-fi
-
-sleep 1
-
-echo "Cleaning Up: Deleting /tmp/tmp.txt"
-rm /dev/shm/tmp.txt
-echo Done
-sleep 1
-
-if [[ $xclip_path != "" ]]
+if [[ xclip = Flase ]]
 then
-	echo File has been compressed and copied to clipboard. To paste it onto the target machine:
-	echo Create a file called bin.txt and paste your clipboard inside of it \(note that depending on the size fo your binary this may take a minute or two\)
-else 
+	echo "xclip not detected. Outputting to file: ./tmp.txt"
+	$b64_path /dev/shm/tmp.gz > ./tmp.txt
+	sleep .3
+
 	echo File has been compressed and output to ./tmp.txt. To paste it onto the target machine:
+	sleep .3
+
 	echo Create a file called bin.txt and paste the contents of ./tmp.txt inside of it \(note that depending on the size fo your binary this may take a minute or two\) 
+	sleep .3
+else
+	echo "xclip detected. Outputting to clipboard"
+	sleep .3
+
+	$b64_path /dev/shm/tmp.gz | $xclip_path -sel c
+	echo File has been compressed and copied to clipboard. To paste it onto the target machine:
+	sleep .3
+
+	echo Create a file called bin.txt and paste your clipboard inside of it \(note that depending on the size fo your binary this may take a minute or two\)
+	sleep .3
 fi
 
 echo Then execute the following command:
-echo $b64_path -d bin.txt \> bin.gz\; gunzip bin.gz\; chmod +x bin 
+sleep 3
+
+echo $b64_path -d bin.txt \> bin.gz\; gunzip bin.gz\; chmod +x bin\; rm bin.txt
+echo " "
+sleep 1
+
+echo "Cleaning Up: Deleting /dev/shm/tmp.gz"
+rm /dev/shm/tmp.gz
+echo Done
+sleep 1
